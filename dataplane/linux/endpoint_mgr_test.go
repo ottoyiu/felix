@@ -1432,7 +1432,7 @@ func endpointManagerTests(ipVersion uint8) func() {
 						} else {
 							mockProcSys.checkState(map[string]string{
 								"/proc/sys/net/ipv4/conf/cali12345-ab/forwarding":     "1",
-								"/proc/sys/net/ipv4/conf/cali12345-ab/rp_filter":      "1",
+								"/proc/sys/net/ipv4/conf/cali12345-ab/rp_filter":      "0",
 								"/proc/sys/net/ipv4/conf/cali12345-ab/route_localnet": "1",
 								"/proc/sys/net/ipv4/conf/cali12345-ab/proxy_arp":      "1",
 								"/proc/sys/net/ipv4/neigh/cali12345-ab/proxy_delay":   "0",
