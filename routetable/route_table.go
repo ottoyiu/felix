@@ -525,6 +525,10 @@ func (r *RouteTable) syncRoutesForLink(ifaceName string) error {
 			leaveDirty = true
 			continue
 		}
+		if route.Protocol == syscall.RTPROT_BIRD {
+			logCxt.Debug("Syncing routes: found BIRD exported route; ignoring.")
+			continue
+		}
 		logCxt.Info("Syncing routes: removing old route.")
 		if err := nl.RouteDel(&route); err != nil {
 			// Probably a race with the interface being deleted.

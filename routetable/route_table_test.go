@@ -89,7 +89,7 @@ var _ = Describe("RouteTable", func() {
 
 	Describe("with some interfaces", func() {
 		var cali1, cali3, eth0 *mockLink
-		var gatewayRoute, cali1Route, cali1Route2, cali3Route netlink.Route
+		var gatewayRoute, cali1Route, cali1Route2, cali3Route, birdRoute netlink.Route
 		BeforeEach(func() {
 			eth0 = dataplane.addIface(0, "eth0", true, true)
 			cali1 = dataplane.addIface(1, "cali1", true, true)
@@ -119,32 +119,40 @@ var _ = Describe("RouteTable", func() {
 				Gw:        net.ParseIP("12.0.0.1"),
 			}
 			dataplane.addMockRoute(&gatewayRoute)
+			birdRoute = netlink.Route{
+				LinkIndex: cali1.attrs.Index,
+				Dst:       mustParseCIDR("10.0.0.4/32"),
+				Type:      syscall.RTN_UNICAST,
+				Protocol:  syscall.RTPROT_BIRD,
+				Scope:     netlink.SCOPE_LINK,
+			}
+			dataplane.addMockRoute(&birdRoute)
 		})
 		It("should wait for the route cleanup delay", func() {
 			t.setAutoIncrement(0 * time.Second)
 			rt.Apply()
-			Expect(dataplane.routeKeyToRoute).To(ConsistOf(cali1Route, cali3Route, gatewayRoute))
+			Expect(dataplane.routeKeyToRoute).To(ConsistOf(cali1Route, cali3Route, gatewayRoute, birdRoute))
 			Expect(dataplane.addedRouteKeys).To(BeEmpty())
 			t.incrementTime(11 * time.Second)
 			rt.Apply()
-			Expect(dataplane.routeKeyToRoute).To(ConsistOf(gatewayRoute))
+			Expect(dataplane.routeKeyToRoute).To(ConsistOf(gatewayRoute, birdRoute))
 			Expect(dataplane.addedRouteKeys).To(BeEmpty())
 		})
 		It("should wait for the route cleanup delay when resyncing", func() {
 			t.setAutoIncrement(0 * time.Second)
 			rt.QueueResync()
 			rt.Apply()
-			Expect(dataplane.routeKeyToRoute).To(ConsistOf(cali1Route, cali3Route, gatewayRoute))
+			Expect(dataplane.routeKeyToRoute).To(ConsistOf(cali1Route, cali3Route, gatewayRoute, birdRoute))
 			Expect(dataplane.addedRouteKeys).To(BeEmpty())
 			t.incrementTime(11 * time.Second)
 			rt.QueueResync()
 			rt.Apply()
-			Expect(dataplane.routeKeyToRoute).To(ConsistOf(gatewayRoute))
+			Expect(dataplane.routeKeyToRoute).To(ConsistOf(gatewayRoute, birdRoute))
 			Expect(dataplane.addedRouteKeys).To(BeEmpty())
 		})
 		It("should clean up only our routes", func() {
 			rt.Apply()
-			Expect(dataplane.routeKeyToRoute).To(ConsistOf(gatewayRoute))
+			Expect(dataplane.routeKeyToRoute).To(ConsistOf(gatewayRoute, birdRoute))
 			Expect(dataplane.addedRouteKeys).To(BeEmpty())
 		})
 		It("should delete only our conntrack entries", func() {
@@ -274,7 +282,7 @@ var _ = Describe("RouteTable", func() {
 					Expect(dataplane.deletedRouteKeys.Contains("3-10.0.0.3/32")).To(BeTrue())
 				})
 				It("should have expected number of routes at the end", func() {
-					Expect(len(dataplane.routeKeyToRoute)).To(Equal(4),
+					Expect(len(dataplane.routeKeyToRoute)).To(Equal(5),
 						fmt.Sprintf("Wrong number of routes %v: %v",
 							len(dataplane.routeKeyToRoute),
 							dataplane.routeKeyToRoute))
@@ -310,13 +318,13 @@ var _ = Describe("RouteTable", func() {
 					})
 
 					It("shouldn't spot the update", func() {
-						Expect(dataplane.routeKeyToRoute).To(HaveLen(5))
+						Expect(dataplane.routeKeyToRoute).To(HaveLen(6))
 						Expect(dataplane.routeKeyToRoute).To(ContainElement(cali1Route2))
 					})
 					It("after a QueueResync() should remove the route", func() {
 						rt.QueueResync()
 						rt.Apply()
-						Expect(dataplane.routeKeyToRoute).To(HaveLen(4))
+						Expect(dataplane.routeKeyToRoute).To(HaveLen(5))
 						Expect(dataplane.routeKeyToRoute).NotTo(ContainElement(cali1Route2))
 					})
 				})
@@ -328,13 +336,13 @@ var _ = Describe("RouteTable", func() {
 					})
 
 					It("shouldn't spot the update", func() {
-						Expect(dataplane.routeKeyToRoute).To(HaveLen(3))
+						Expect(dataplane.routeKeyToRoute).To(HaveLen(4))
 						Expect(dataplane.routeKeyToRoute).NotTo(ContainElement(cali1Route))
 					})
 					It("after a QueueResync() should remove the route", func() {
 						rt.QueueResync()
 						rt.Apply()
-						Expect(dataplane.routeKeyToRoute).To(HaveLen(4))
+						Expect(dataplane.routeKeyToRoute).To(HaveLen(5))
 						Expect(dataplane.routeKeyToRoute).To(ContainElement(cali1Route))
 					})
 				})
